@@ -1,0 +1,29 @@
+source_roots = ["src"]
+
+exact = true
+forbid_circular_dependencies = true
+root_module = "ignore"
+
+exclude = [
+    "**/__pycache__",
+    ".venv/",
+    ".ruff_cache/",
+    ".complexipy_cache/",
+]
+
+[[modules]]
+path = "remarkable_ai.core"
+depends_on = []
+
+[[modules]]
+path = "remarkable_ai.adapters"
+depends_on = [
+    { path = "remarkable_ai.core" },
+]
+
+[[modules]]
+path = "remarkable_ai.cli"
+depends_on = [
+    { path = "remarkable_ai.core" },
+    { path = "remarkable_ai.adapters" },
+]

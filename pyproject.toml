@@ -4,9 +4,16 @@ version = "0.1.0"
 description = "Push diagrams to reMarkable, fetch annotated drawings, render handwritten notes — built for AI-human collaboration."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.11"
-authors = [{ name = "Yassin Imbaby" }]
-keywords = ["remarkable", "tablet", "annotation", "ai", "diagram"]
+requires-python = ">=3.12"
+authors = [{ name = "Yassin Chibrani" }]
+keywords = [
+    "remarkable",
+    "tablet",
+    "annotation",
+    "ai",
+    "diagram",
+    "claude-code",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -19,7 +26,14 @@ dependencies = [
     "rmscene>=0.5",
     "reportlab>=4.0",
     "pypdf>=4.0",
+    "rich>=14.0",
 ]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.11", "ty>=0.0.1a7", "complexipy>=5.2", "tach>=0.34"]
+
+[project.urls]
+Repository = "https://github.com/yassineim/remarkable-ai"
 
 [project.scripts]
 remarkable-ai = "remarkable_ai.cli:main"
@@ -33,7 +47,28 @@ packages = ["src/remarkable_ai"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+select = ["ALL"]
+ignore = [
+    "TRY003",   # long exception messages are fine inline
+    "EM101",    # string literal exceptions are fine inline
+    "EM102",    # f-string exception messages are fine
+    "S603",     # subprocess calls use known commands
+    "S607",     # partial executable paths are intentional (remark CLI)
+    "S108",     # temp directory usage is fine
+    "FBT001",   # boolean positional args are fine in CLI commands
+    "FBT002",   # boolean defaults are fine in CLI commands
+    "PLC0415",  # lazy imports in CLI commands keep --help fast
+    "D203",     # conflicts with D211
+    "D213",     # conflicts with D212
+    "PLR2004",  # magic values like 2 are readable in context
+    "COM812",   # conflicts with ruff formatter
+]
+
+[tool.complexipy]
+max_complexity = 15
+
+[tool.ty.rules]
+unresolved-import = "warn"  # cairosvg is an optional lazy-loaded dependency
