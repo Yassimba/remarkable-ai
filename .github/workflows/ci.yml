@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Lint
+        run: uv run ruff check src/
+
+      - name: Format
+        run: uv run ruff format --check src/
+
+      - name: Boundaries
+        run: uv run tach check
+
+      - name: Complexity
+        run: uv run complexipy src/remarkable_ai/
+
+      - name: Build
+        run: uv build
