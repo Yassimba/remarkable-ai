@@ -9,10 +9,22 @@ import tempfile
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
+from typing import NamedTuple
 
 import rmscene
 from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
+
+
+class Point(NamedTuple):
+    x: float
+    y: float
+    width: float
+
+
+class Stroke(NamedTuple):
+    points: list[Point]
+    color: int  # PenColor enum value
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,8 +62,33 @@ PEN_COLORS: dict[int, tuple[float, float, float]] = {
     7: (0.9, 0.1, 0.0),  # RED
 }
 
+DEFAULT_COLOR = (0.05, 0.05, 0.05)
 
-def extract_strokes(rmdoc_path: Path) -> tuple[list[object], Path]:
+
+def parse_strokes_from_rm(rm_path: Path) -> list[Stroke]:
+    """Parse .rm binary file into typed Stroke objects."""
+    with open(rm_path, "rb") as f:
+        blocks = list(rmscene.read_blocks(f))
+
+    strokes: list[Stroke] = []
+    for block in blocks:
+        if not isinstance(block, rmscene.SceneLineItemBlock):
+            continue
+        item = getattr(block, "item", None)
+        if item is None:
+            continue
+        value = getattr(item, "value", None)
+        if value is None or not getattr(value, "points", None):
+            continue
+
+        color_val = getattr(getattr(value, "color", None), "value", 0)
+        points = [Point(x=p.x, y=p.y, width=p.width) for p in value.points]
+        strokes.append(Stroke(points=points, color=color_val))
+
+    return strokes
+
+
+def extract_strokes(rmdoc_path: Path) -> tuple[list[Stroke], Path]:
     """Extract annotation strokes and original PDF from an .rmdoc archive."""
     extract_dir = Path(tempfile.mkdtemp(prefix="rm-"))
     subprocess.run(
@@ -69,24 +106,12 @@ def extract_strokes(rmdoc_path: Path) -> tuple[list[object], Path]:
         msg = "No PDF found in rmdoc archive"
         raise FileNotFoundError(msg)
 
-    with open(rm_files[0], "rb") as f:
-        blocks = list(rmscene.read_blocks(f))
-
-    lines = []
-    for block in blocks:
-        if type(block).__name__ != "SceneLineItemBlock":
-            continue
-        if not hasattr(block, "item") or not hasattr(block.item, "value"):
-            continue
-        line = block.item.value
-        if line and hasattr(line, "points") and line.points:
-            lines.append(line)
-
-    return lines, pdf_files[0]
+    strokes = parse_strokes_from_rm(rm_files[0])
+    return strokes, pdf_files[0]
 
 
 def render_annotations(
-    lines: list[object],
+    strokes: list[Stroke],
     pdf_path: Path,
     output_path: str,
     transform: CalibrationTransform = DEFAULT_TRANSFORM,
@@ -100,22 +125,20 @@ def render_annotations(
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=(pdf_w, pdf_h))
 
-    for line in lines:
-        pts = line.points
-        if len(pts) < 2:
+    for stroke in strokes:
+        if len(stroke.points) < 2:
             continue
 
-        color_val = getattr(line.color, "value", 0) if hasattr(line, "color") else 0
-        r, g, b = PEN_COLORS.get(color_val, (0.05, 0.05, 0.05))
+        r, g, b = PEN_COLORS.get(stroke.color, DEFAULT_COLOR)
         c.setStrokeColorRGB(r, g, b)
 
-        width = max(0.3, pts[0].width * abs(transform.scale_x) * 0.15)
+        width = max(0.3, stroke.points[0].width * abs(transform.scale_x) * 0.15)
         c.setLineWidth(width)
 
         p = c.beginPath()
-        x0, y0 = transform.to_pdf(pts[0].x, pts[0].y)
+        x0, y0 = transform.to_pdf(stroke.points[0].x, stroke.points[0].y)
         p.moveTo(x0, y0)
-        for pt in pts[1:]:
+        for pt in stroke.points[1:]:
             x, y = transform.to_pdf(pt.x, pt.y)
             p.lineTo(x, y)
         c.drawPath(p, stroke=1, fill=0)
@@ -130,4 +153,4 @@ def render_annotations(
     with open(output_path, "wb") as f:
         writer.write(f)
 
-    print(f"Rendered {len(lines)} strokes → {output_path}")
+    print(f"Rendered {len(strokes)} strokes → {output_path}")

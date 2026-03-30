@@ -1,8 +1,13 @@
 """remarkable-ai CLI: push diagrams, fetch annotations, render SVGs, create blank pages."""
 
+import sys
+import tempfile
 from pathlib import Path
 
 import cyclopts
+
+from remarkable_ai.remarkable import RemarkableError
+from remarkable_ai.svg import SvgConversionError
 
 app = cyclopts.App(
     name="remarkable-ai",
@@ -12,7 +17,25 @@ app = cyclopts.App(
 DEFAULT_FOLDER = "/AI Brainstorm/"
 
 
+def handle_errors(func):  # noqa: ANN001, ANN201 — cyclopts decorator compat
+    """Wrap CLI commands to catch domain errors and print cleanly."""
+
+    def wrapper(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        try:
+            return func(*args, **kwargs)
+        except (RemarkableError, SvgConversionError, FileNotFoundError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    wrapper.__name__ = func.__name__
+    wrapper.__doc__ = func.__doc__
+    wrapper.__annotations__ = func.__annotations__
+    wrapper.__module__ = func.__module__
+    return wrapper
+
+
 @app.command
+@handle_errors
 def push(
     path: Path,
     folder: str = DEFAULT_FOLDER,
@@ -21,30 +44,26 @@ def push(
 
     If the file is an SVG, it's converted to PDF first.
     """
-    if path.suffix == ".svg":
-        from remarkable_ai.svg import svg_to_pdf
+    from remarkable_ai.remarkable import push as do_push
+    from remarkable_ai.svg import svg_to_pdf
 
+    if path.suffix == ".svg":
         pdf_path = svg_to_pdf(str(path))
         print(f"Converted SVG → {pdf_path}")
     else:
         pdf_path = str(path)
 
-    from remarkable_ai.remarkable import push as do_push
-
     do_push(pdf_path, folder)
 
 
 @app.command
+@handle_errors
 def fetch(
     name: str,
     folder: str = DEFAULT_FOLDER,
     output: str | None = None,
 ) -> None:
-    """Download an annotated document from the reMarkable and render annotations.
-
-    Downloads the .rmdoc, extracts handwritten strokes, renders them onto
-    the original PDF with calibrated coordinate alignment, and saves the result.
-    """
+    """Download an annotated document from the reMarkable and render annotations."""
     from remarkable_ai.remarkable import fetch as do_fetch
 
     result = do_fetch(name, folder, output)
@@ -52,6 +71,7 @@ def fetch(
 
 
 @app.command(name="list")
+@handle_errors
 def list_files(
     folder: str = DEFAULT_FOLDER,
 ) -> None:
@@ -62,62 +82,49 @@ def list_files(
 
 
 @app.command
+@handle_errors
 def blank(
     title: str,
     folder: str = DEFAULT_FOLDER,
 ) -> None:
-    """Create a blank page with a title and push it to the reMarkable.
-
-    Use this to set up a drawing surface before sketching an explanation.
-    """
+    """Create a blank page with a title and push it to the reMarkable."""
     from remarkable_ai.blank import create_blank_page
     from remarkable_ai.remarkable import push as do_push
 
     slug = title.lower().replace(" ", "-")[:40]
-    pdf_path = f"/tmp/{slug}.pdf"
+    pdf_path = str(Path(tempfile.gettempdir()) / f"{slug}.pdf")
     create_blank_page(title, pdf_path)
     do_push(pdf_path, folder)
 
 
 @app.command
+@handle_errors
 def render(
     svg_path: Path,
     pdf: bool = False,
     push_to_tablet: bool = False,
     folder: str = DEFAULT_FOLDER,
 ) -> None:
-    """Render an SVG to PNG (for review) or PDF, optionally push to reMarkable.
+    """Render an SVG to PNG (for review) or PDF, optionally push to reMarkable."""
+    from remarkable_ai.remarkable import push as do_push
+    from remarkable_ai.svg import svg_to_pdf, svg_to_png
 
-    Without --pdf, renders to PNG for visual inspection.
-    With --pdf, converts to PDF.
-    With --push-to-tablet, also uploads the PDF to the reMarkable.
-    """
     if pdf or push_to_tablet:
-        from remarkable_ai.svg import svg_to_pdf
-
         result = svg_to_pdf(str(svg_path))
         print(f"PDF: {result}")
         if push_to_tablet:
-            from remarkable_ai.remarkable import push as do_push
-
             do_push(result, folder)
     else:
-        from remarkable_ai.svg import svg_to_png
-
         result = svg_to_png(str(svg_path))
         print(f"PNG: {result}")
 
 
 @app.command
+@handle_errors
 def calibrate(
     folder: str = DEFAULT_FOLDER,
 ) -> None:
-    """Push a 9-point calibration grid to the reMarkable.
-
-    Circle each crosshair on the tablet, sync, then run:
-        remarkable-ai fetch calibration-grid
-    to verify alignment.
-    """
+    """Push a 9-point calibration grid to the reMarkable."""
     from remarkable_ai.calibrate import create_calibration_grid
     from remarkable_ai.remarkable import push as do_push
 

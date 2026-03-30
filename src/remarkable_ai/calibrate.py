@@ -1,15 +1,19 @@
 """Calibration grid: generate a 9-point crosshair PDF for solving the coordinate transform."""
 
+import tempfile
+from pathlib import Path
+
 from reportlab.pdfgen import canvas
 
 
 def create_calibration_grid(
-    output: str = "/tmp/calibration-grid.pdf",
+    output: str | None = None,
     width: int = 1152,
     height: int = 936,
 ) -> str:
     """Create a PDF with 9 crosshairs at known positions for coordinate calibration."""
-    c = canvas.Canvas(output, pagesize=(width, height))
+    out = output or str(Path(tempfile.gettempdir()) / "calibration-grid.pdf")
+    c = canvas.Canvas(out, pagesize=(width, height))
     c.setFont("Helvetica-Bold", 18)
     c.setStrokeColorRGB(0.8, 0.2, 0.2)
     c.setLineWidth(2)
@@ -38,4 +42,4 @@ def create_calibration_grid(
     c.setFont("Helvetica", 14)
     c.drawCentredString(width // 2, height // 2 + 15, "then sync and run: remarkable-ai fetch calibration-grid")
     c.save()
-    return output
+    return out
