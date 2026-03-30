@@ -33,7 +33,7 @@ dependencies = [
 dev = ["ruff>=0.11", "ty>=0.0.1a7", "complexipy>=5.2", "tach>=0.34"]
 
 [project.urls]
-Repository = "https://github.com/yassineim/remarkable-ai"
+Repository = "https://github.com/Yassimba/remarkable-ai"
 
 [project.scripts]
 remarkable-ai = "remarkable_ai.cli:main"
