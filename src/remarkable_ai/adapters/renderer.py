@@ -100,7 +100,9 @@ def extract_strokes(rmdoc_path: Path) -> tuple[list[Stroke], Path]:
         shutil.rmtree(extract_dir, ignore_errors=True)
         raise RemarkableError("No PDF found in rmdoc archive")
 
-    strokes = parse_strokes_from_rm(rm_files[0])
+    strokes: list[Stroke] = []
+    for rm_file in rm_files:
+        strokes.extend(parse_strokes_from_rm(rm_file))
 
     stable_pdf = Path(tempfile.gettempdir()) / pdf_files[0].name
     shutil.copy2(pdf_files[0], stable_pdf)

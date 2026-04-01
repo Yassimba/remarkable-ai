@@ -1,8 +1,7 @@
 """The ``remarkable-ai`` CLI entry point.
 
-Commands live in ``commands.py`` and register themselves on the ``app``
-when ``main()`` imports them. Everything else (adapters, reportlab,
-rmscene) is lazy-imported inside each command so ``--help`` stays fast.
+Commands register themselves on ``app`` via @app.command decorators
+when ``commands`` is imported at the bottom of this file.
 """
 
 import sys
@@ -43,6 +42,9 @@ def handle_errors(func: Command) -> Command:
 
 def main() -> None:
     """Entry point for the remarkable-ai CLI."""
-    import remarkable_ai.cli.commands  # noqa: F401
-
     app()
+
+
+# Import after app/console/handle_errors are defined — commands.py
+# depends on them, so this must come last to avoid circular imports.
+from remarkable_ai.cli import commands as commands

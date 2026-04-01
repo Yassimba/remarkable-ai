@@ -1,6 +1,6 @@
 [project]
 name = "remarkable-ai"
-version = "0.1.0"
+version = "0.2.0"
 description = "Push diagrams to reMarkable, fetch annotated drawings, render handwritten notes — built for AI-human collaboration."
 readme = "README.md"
 license = "MIT"
@@ -60,12 +60,15 @@ ignore = [
     "S108",     # temp directory usage is fine
     "FBT001",   # boolean positional args are fine in CLI commands
     "FBT002",   # boolean defaults are fine in CLI commands
-    "PLC0415",  # lazy imports in CLI commands keep --help fast
     "D203",     # conflicts with D211
     "D213",     # conflicts with D212
     "PLR2004",  # magic values like 2 are readable in context
     "COM812",   # conflicts with ruff formatter
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"src/remarkable_ai/adapters/svg.py" = ["PLC0415"]  # cairosvg is optional, must be lazy
+"src/remarkable_ai/cli/__init__.py" = ["E402"]      # commands import must follow app definition
 
 [tool.complexipy]
 max_complexity = 15

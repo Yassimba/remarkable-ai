@@ -8,3 +8,5 @@ build/
 .ruff_cache/
 .complexipy_cache/
 .claude/
+e2e-output/
+.playwright-mcp/
