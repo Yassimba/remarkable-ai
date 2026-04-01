@@ -14,60 +14,54 @@ draw on them with a pen, pull the annotations back as a PDF.
                                           └─────────┘
 ```
 
-## Install
+## Quickstart
 
 ```bash
-uv tool install remarkable-ai
+pip install remarkable-ai
+remarkable-ai setup
 ```
 
-You also need the [`remark`](https://github.com/ddvk/rmapi) CLI
-(Go binary) authenticated with your reMarkable cloud account:
-
-```bash
-go install github.com/ddvk/rmapi@latest
-rmapi  # follow the auth prompt once
-```
+That's it. `setup` downloads the [remark](https://github.com/ddvk/rmapi)
+binary for your platform and walks you through cloud auth. No Go
+toolchain needed.
 
 ## Commands
 
 ```bash
-# Push a PDF or SVG to the tablet (SVGs auto-convert to PDF)
-remarkable-ai push architecture.pdf
-remarkable-ai push diagram.svg
-
-# Fetch an annotated document — renders handwriting onto the original PDF
-remarkable-ai fetch architecture --output annotated.pdf
-
-# Create a blank titled page for freehand drawing
-remarkable-ai blank "Neural Networks"
-
-# Convert SVG to PNG (for review) or PDF
-remarkable-ai render diagram.svg
+remarkable-ai setup                        # download remark + authenticate
+remarkable-ai push architecture.pdf        # upload PDF to tablet
+remarkable-ai push diagram.svg             # auto-converts SVG to PDF first
+remarkable-ai fetch architecture           # pull annotated doc, render strokes onto PDF
+remarkable-ai blank "Neural Networks"      # push a titled blank page for drawing
+remarkable-ai render diagram.svg           # SVG to PNG (for review)
 remarkable-ai render diagram.svg --pdf --push-to-tablet
-
-# Push a 9-point crosshair grid, then solve the coordinate transform
-remarkable-ai calibrate
-
-# List files on the tablet
-remarkable-ai list
+remarkable-ai calibrate                    # push 9-point grid for coordinate alignment
+remarkable-ai list                         # list files on tablet
 ```
 
-Everything lands in `/AI Brainstorm/` by default. Pass `--folder` to change it.
+All commands default to the `/AI Brainstorm/` folder. Pass `--folder` to change it.
 
-## How the fetch pipeline works
+## How fetch works
 
-When you `fetch`, three things happen:
+```
+.rmdoc archive          .rm binary             annotated PDF
+┌────────────┐     ┌──────────────┐     ┌───────────────────┐
+│ diagram.pdf│     │ SceneLineItem│     │ original PDF      │
+│ *.rm files │────▶│  → Stroke[]  │────▶│ + stroke overlay  │
+└────────────┘     └──────────────┘     └───────────────────┘
+  extract_strokes    parse_strokes        render_annotations
+                     _from_rm
+```
 
-1. **Download** — `remark get` pulls the `.rmdoc` archive from the cloud
-2. **Extract** — the archive is a ZIP with the original PDF and `.rm` binary
-   annotation files; we parse the pen strokes out of the `.rm` with
-   [rmscene](https://github.com/ricklupton/rmscene)
-3. **Render** — each stroke is drawn onto a transparent PDF overlay (reportlab),
-   then merged onto page 1 of the original (pypdf)
+1. `remark get` pulls the `.rmdoc` archive from the cloud
+2. The archive is a ZIP with the original PDF and `.rm` annotation layers.
+   [rmscene](https://github.com/ricklupton/rmscene) parses the pen strokes.
+3. Each stroke lands on a transparent PDF overlay (reportlab), merged onto
+   page 1 of the original (pypdf)
 
 The coordinate mapping comes from a calibrated affine transform. Run
-`remarkable-ai calibrate` once — circle each crosshair on the tablet, fetch
-it back, and the least-squares solver fits the transform.
+`remarkable-ai calibrate` once, circle each crosshair on the tablet,
+fetch it back. The transform solves from there.
 
 ## Architecture
 
@@ -83,47 +77,41 @@ src/remarkable_ai/
 │   ├── in_memory.py      # InMemoryAdapter — fake transport for tests
 │   ├── renderer.py       # .rm parsing + PDF overlay compositing
 │   ├── svg.py            # SVG→PNG/PDF (rsvg → cairosvg → Inkscape)
-│   └── templates.py      # Blank page + calibration grid PDFs
-└── cli/                  # The remarkable-ai command. Depends on both.
+│   ├── templates.py      # Blank page + calibration grid PDFs
+│   └── setup.py          # Binary download + install
+└── cli/                  # Wires adapters together.
     ├── __init__.py       # App, console, error handling, entry point
-    └── commands.py       # push, fetch, list, blank, render, calibrate
+    └── commands.py       # setup, push, fetch, list, blank, render, calibrate
 ```
 
-Boundaries are enforced by [tach](https://github.com/gauge-sh/tach) —
+Boundaries enforced by [tach](https://github.com/gauge-sh/tach) —
 `core` never imports from `adapters` or `cli`.
 
 ## Claude Code skills
 
-Three skills use this CLI to turn a conversation into a whiteboard session.
-Copy the `skills/` directory into your project's `.claude/skills/` to use them.
+Three skills in the `skills/` directory turn a conversation into a
+whiteboard session. Copy them to your project's `.claude/skills/`.
 
-### `/explain-me` — Claude draws, you read
+**`/explain-me`** — Claude draws, you read. Generates an SVG diagram,
+self-reviews it by rendering to PNG, then pushes the final version to
+your tablet.
 
-Claude generates an SVG diagram explaining a concept, self-reviews it
-by rendering to PNG and checking for overlaps/alignment, then pushes the
-final version to your tablet.
+**`/explain`** — You draw, Claude reads. Pushes a blank page to the
+tablet. You sketch with the pen. Claude fetches it back and interprets
+the drawing.
 
-### `/explain` — you draw, Claude reads
-
-Creates a blank page on the tablet. You sketch your idea with the pen.
-Claude fetches it back and interprets the drawing — identifies shapes,
-arrows, labels, and maps them to technical concepts.
-
-### `/architect` — collaborative architecture design
-
-Given a plan, Claude proposes a hexagonal architecture with an ASCII tree,
-a detail table, and a draw.io diagram pushed to the tablet. You annotate
-with the pen. Claude fetches your notes and argues back from architecture
-principles. Iterate until you agree.
+**`/architect`** — Collaborative architecture design. Claude proposes
+structure (any style — hexagonal, layered, flat, whatever fits), pushes
+a diagram to the tablet. You annotate with the pen. Claude fetches your
+notes and argues back from principles. Repeat until you agree.
 
 ## Development
 
 ```bash
-git clone https://github.com/yassineim/remarkable-ai
+git clone https://github.com/Yassimba/remarkable-ai
 cd remarkable-ai
 uv sync --all-extras
 
-# Quality gates
 uv run ruff check src/          # lint
 uv run ruff format --check src/ # format
 uv run tach check               # boundary enforcement
