@@ -17,7 +17,7 @@ draw on them with a pen, pull the annotations back as a PDF.
 ## Quickstart
 
 ```bash
-pip install remarkable-ai
+uv tool install remarkable-ai
 remarkable-ai setup
 ```
 
