@@ -1,6 +1,6 @@
 [project]
 name = "remarkable-ai"
-version = "0.2.0"
+version = "0.2.1"
 description = "Push diagrams to reMarkable, fetch annotated drawings, render handwritten notes — built for AI-human collaboration."
 readme = "README.md"
 license = "MIT"
